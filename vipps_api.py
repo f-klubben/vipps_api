@@ -17,7 +17,7 @@ class AccountingAPI(object):
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
     tokens = None
 
-    myshop_number = 90601
+    myshop_number = 90602
     logger = logging.getLogger(__name__)
 
     @classmethod
