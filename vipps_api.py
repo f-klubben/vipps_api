@@ -23,14 +23,14 @@ class AccountingAPITokens:
 
 
 @dataclass
-class AccountingAPISession:
+class AccessToken:
     """
-    Stores the shortlived state used in the API.
+    Stores the access token retrieved, which expires every 15 minutes.
+    https://developer.vippsmobilepay.com/docs/APIs/access-token-api/partner-authentication/
     """
 
     access_token: str
     access_token_timeout: str
-    cursor: str | None
 
 
 class ReportAPI(object):
@@ -40,8 +40,9 @@ class ReportAPI(object):
     tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
     tokens: AccountingAPITokens
-    session: AccountingAPISession
+    session: AccessToken
     ledger_id: int | None
+    cursor: str | None
 
     myshop_number = 90602
     logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class ReportAPI(object):
         return AccountingAPITokens(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
 
     @classmethod
-    def __retrieve_new_session(cls) -> AccountingAPISession:
+    def __retrieve_new_session(cls) -> AccessToken:
         """
         Fetches a new access token using the refresh token.
         :return: Tuple of (access_token, access_token_timeout)
@@ -105,7 +106,7 @@ class ReportAPI(object):
         access_token = json_response['access_token']
         access_token_timeout = expire_time.isoformat(timespec='milliseconds')
 
-        return AccountingAPISession(access_token=access_token, access_token_timeout=access_token_timeout, cursor=None)
+        return AccessToken(access_token=access_token, access_token_timeout=access_token_timeout)
 
     @classmethod
     def get_ledger_info(cls, myshop_number: int):
@@ -217,7 +218,7 @@ class ReportAPI(object):
         cls.__refresh_expired_token()
 
         transactions = []
-        cursor = "" if cls.session.cursor is None else cls.session.cursor
+        cursor = "" if cls.cursor is None else cls.cursor
 
         while True:
             res = cls.fetch_report_by_feed(cursor)
@@ -233,5 +234,5 @@ class ReportAPI(object):
             if len(res['items']) == 0:
                 break
 
-        cls.session.cursor = cursor
+        cls.cursor = cursor
         return transactions
