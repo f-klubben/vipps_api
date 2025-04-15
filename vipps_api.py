@@ -27,9 +27,9 @@ class AccountingAPIKeys:
     client_secret: str
 
 @dataclass
-class AccessToken:
+class ReportAPIAccessToken:
     """
-    Stores the access token retrieved, which expires every 15 minutes.
+    The session access token used in report API. Expires every 15 minutes.
     https://developer.vippsmobilepay.com/docs/APIs/access-token-api/partner-authentication/
     """
 
@@ -44,7 +44,7 @@ class ReportAPI(object):
     tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
     tokens: AccountingAPIKeys
-    session: AccessToken
+    session: ReportAPIAccessToken
     ledger_id: int | None
     cursor: str | None
 
@@ -86,7 +86,7 @@ class ReportAPI(object):
         return AccountingAPIKeys(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
 
     @classmethod
-    def __retrieve_new_session(cls) -> AccessToken:
+    def __retrieve_new_session(cls) -> ReportAPIAccessToken:
         """
         Fetches a new access token using the refresh token.
         :return: Tuple of (access_token, access_token_timeout)
@@ -110,7 +110,7 @@ class ReportAPI(object):
         access_token = json_response['access_token']
         access_token_timeout = expire_time.isoformat(timespec='milliseconds')
 
-        return AccessToken(access_token=access_token, access_token_timeout=access_token_timeout)
+        return ReportAPIAccessToken(access_token=access_token, access_token_timeout=access_token_timeout)
 
     @classmethod
     def get_ledger_info(cls, myshop_number: int):

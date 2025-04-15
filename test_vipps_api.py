@@ -29,7 +29,7 @@ class TestAPI:
         expectedLedgerId = 123456
 
         ReportAPI.tokens_file = (Path(__file__).parent / 'fixtures' / 'vipps-tokens.valid.json').as_posix()
-        ReportAPI.session = AccessToken("_access_token_", "")
+        ReportAPI.session = ReportAPIAccessToken("_access_token_", "")
 
         actualLedgerId = ReportAPI.get_ledger_id(0)
 
