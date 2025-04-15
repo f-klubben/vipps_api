@@ -26,6 +26,7 @@ class AccountingAPIKeys:
     client_id: str
     client_secret: str
 
+
 @dataclass
 class ReportAPIAccessToken:
     """
