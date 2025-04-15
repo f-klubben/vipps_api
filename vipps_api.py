@@ -9,6 +9,11 @@ import json
 import logging
 
 from dataclasses import dataclass
+from typing import Any
+
+
+class TokenFileException(Exception):
+    pass
 
 
 @dataclass(frozen=True)
@@ -41,18 +46,33 @@ class AccountingAPI(object):
     logger = logging.getLogger(__name__)
 
     @classmethod
-    def __read_token_storage(cls):
+    def __read_token_storage(cls) -> AccountingAPITokens:
         """
         Reads the token variable from disk
         """
+        raw_tokens: Any
         with open(cls.tokens_file, 'r') as json_file:
-            cls.tokens = json.load(json_file)
+            raw_tokens = json.load(json_file)
 
-        if cls.tokens is None:
+        if raw_tokens is None:
             cls.logger.error("read token from storage. 'tokens' is None. Reverting to backup tokens")
 
             with open(cls.tokens_file_backup, 'r') as json_file_backup:
-                cls.tokens = json.load(json_file_backup)
+                raw_tokens = json.load(json_file_backup)
+
+        # Read tokens
+        if raw_tokens is None:
+            raise TokenFileException("Token file is None")
+
+        if 'client_id' not in raw_tokens:
+            cls.logger.error("[__read_token_storage] 'client_id' is not defined in token file")
+            raise TokenFileException("client_id missing")
+
+        if 'client_secret' not in raw_tokens:
+            cls.logger.error("[__read_token_storage] 'client_secret' is not defined in token file")
+            raise TokenFileException("client_secret missing")
+
+        return AccountingAPITokens(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
 
     @classmethod
     def __update_token_storage(cls):
