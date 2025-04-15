@@ -8,6 +8,18 @@ from pathlib import Path
 import json
 import logging
 
+from dataclasses import dataclass
+
+@dataclass
+class AccountingAPITokens():
+    client_id: str
+    client_secret: str
+
+    # Short-lived
+    access_token: str
+    ledger_id: str
+    cursor: str | None
+
 
 class AccountingAPI(object):
     api_endpoint = 'https://api.vipps.no'
@@ -15,7 +27,7 @@ class AccountingAPI(object):
     # Important to use a separate file since the tokens can change and is thus not suitable for django settings.
     tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
-    tokens = None
+    tokens: AccountingAPITokens
 
     myshop_number = 90602
     logger = logging.getLogger(__name__)
@@ -102,13 +114,13 @@ class AccountingAPI(object):
 
         ledger_date = transaction_date.strftime('%Y-%m-%d')
 
-        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.tokens['ledger_id']}/funds/dates/{ledger_date}"
+        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.tokens.ledger_id}/funds/dates/{ledger_date}"
 
         params = {
             'includeGDPRSensitiveData': "true",
         }
         headers = {
-            'authorization': 'Bearer {}'.format(cls.tokens['access_token']),
+            'authorization': 'Bearer {}'.format(cls.tokens.access_token),
         }
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
@@ -116,14 +128,14 @@ class AccountingAPI(object):
 
     @classmethod
     def fetch_report_by_feed(cls, cursor: str):
-        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.tokens['ledger_id']}/funds/feed"
+        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.tokens.ledger_id}/funds/feed"
 
         params = {
             'includeGDPRSensitiveData': "true",
             'cursor': cursor,
         }
         headers = {
-            'authorization': "Bearer {}".format(cls.tokens['access_token']),
+            'authorization': "Bearer {}".format(cls.tokens.access_token),
         }
 
         response = requests.get(url, params=params, headers=headers)
@@ -142,7 +154,7 @@ class AccountingAPI(object):
         cls.__refresh_expired_token()
 
         transactions = []
-        cursor = cls.tokens.get('cursor', "")
+        cursor = "" if cls.tokens.cursor is None else cls.tokens.cursor
 
         while True:
             res = cls.fetch_report_by_feed(cursor)
@@ -158,7 +170,7 @@ class AccountingAPI(object):
             if len(res['items']) == 0:
                 break
 
-        cls.tokens['cursor'] = cursor
+        cls.tokens.cursor = cursor
         cls.__update_token_storage()
         return transactions
 
@@ -186,7 +198,7 @@ class AccountingAPI(object):
         url = f"{cls.api_endpoint}/settlement/v1/ledgers"
         params = {'settlesForRecipientHandles': 'DK:{}'.format(myshop_number)}
         headers = {
-            'authorization': 'Bearer {}'.format(cls.tokens['access_token']),
+            'authorization': 'Bearer {}'.format(cls.tokens.access_token),
         }
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
