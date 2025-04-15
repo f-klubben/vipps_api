@@ -17,10 +17,14 @@ class TokenFileException(Exception):
 
 
 @dataclass(frozen=True)
-class AccountingAPITokens:
+class AccountingAPIKeys:
+    """
+    The lowest level API keys, which only provide access to ReportAPI.
+    https://developer.vippsmobilepay.com/docs/partner/partner-keys/
+    """
+
     client_id: str
     client_secret: str
-
 
 @dataclass
 class AccessToken:
@@ -39,7 +43,7 @@ class ReportAPI(object):
     # Important to use a separate file since the tokens can change and is thus not suitable for django settings.
     tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
-    tokens: AccountingAPITokens
+    tokens: AccountingAPIKeys
     session: AccessToken
     ledger_id: int | None
     cursor: str | None
@@ -53,7 +57,7 @@ class ReportAPI(object):
         cls.session = cls.__retrieve_access_token()
 
     @classmethod
-    def __read_token_storage(cls) -> AccountingAPITokens:
+    def __read_token_storage(cls) -> AccountingAPIKeys:
         """
         Reads the token variable from disk
         """
@@ -79,7 +83,7 @@ class ReportAPI(object):
             cls.logger.error("[__read_token_storage] 'client_secret' is not defined in token file")
             raise TokenFileException("client_secret missing")
 
-        return AccountingAPITokens(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
+        return AccountingAPIKeys(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
 
     @classmethod
     def __retrieve_new_session(cls) -> AccessToken:
