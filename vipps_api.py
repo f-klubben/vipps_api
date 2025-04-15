@@ -34,7 +34,7 @@ class AccountingAPISession:
     cursor: str | None
 
 
-class AccountingAPI():
+class AccountingAPI:
     api_endpoint = 'https://api.vipps.no'
     # Saves secret tokens to the file "vipps-tokens.json" right next to this file.
     # Important to use a separate file since the tokens can change and is thus not suitable for django settings.
@@ -100,10 +100,7 @@ class AccountingAPI():
         # Calculate when the token expires
         expire_time = datetime.now() + timedelta(seconds=json_response['expires_in'] - 1)
 
-        return (
-            json_response['access_token'],
-            expire_time.isoformat(timespec='milliseconds')
-        )
+        return (json_response['access_token'], expire_time.isoformat(timespec='milliseconds'))
 
     @classmethod
     def __retrieve_new_session(cls) -> AccountingAPISession:
@@ -112,7 +109,9 @@ class AccountingAPI():
 
         cls.logger.info("[__refresh_session] Successfully retrieved new session tokens")
 
-        return AccountingAPISession(access_token=access_token, access_token_timeout=access_token_timeout, ledger_id=ledger_id, cursor=None)
+        return AccountingAPISession(
+            access_token=access_token, access_token_timeout=access_token_timeout, ledger_id=ledger_id, cursor=None
+        )
 
     @classmethod
     def __refresh_expired_token(cls):
