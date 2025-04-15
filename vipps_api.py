@@ -8,49 +8,82 @@ from pathlib import Path
 import json
 import logging
 
+from dataclasses import dataclass
+from typing import Any, Tuple
 
-class AccountingAPI(object):
+
+class TokenFileException(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class AccountingAPITokens:
+    client_id: str
+    client_secret: str
+
+
+@dataclass
+class AccountingAPISession:
+    """
+    Stores the shortlived state used in the API.
+    """
+
+    access_token: str
+    access_token_timeout: str
+    ledger_id: int
+    cursor: str | None
+
+
+class AccountingAPI:
     api_endpoint = 'https://api.vipps.no'
     # Saves secret tokens to the file "vipps-tokens.json" right next to this file.
     # Important to use a separate file since the tokens can change and is thus not suitable for django settings.
     tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
-    tokens = None
+    tokens: AccountingAPITokens
+    session: AccountingAPISession
 
     myshop_number = 90602
     logger = logging.getLogger(__name__)
 
+    def __init__(self):
+        self.session = self.__retrieve_access_token()
+        self.tokens = self.__read_token_storage()
+
     @classmethod
-    def __read_token_storage(cls):
+    def __read_token_storage(cls) -> AccountingAPITokens:
         """
         Reads the token variable from disk
         """
+        raw_tokens: Any
         with open(cls.tokens_file, 'r') as json_file:
-            cls.tokens = json.load(json_file)
+            raw_tokens = json.load(json_file)
 
-        if cls.tokens is None:
+        if raw_tokens is None:
             cls.logger.error("read token from storage. 'tokens' is None. Reverting to backup tokens")
 
             with open(cls.tokens_file_backup, 'r') as json_file_backup:
-                cls.tokens = json.load(json_file_backup)
+                raw_tokens = json.load(json_file_backup)
+
+        # Read tokens
+        if raw_tokens is None:
+            raise TokenFileException("Token file is None")
+
+        if 'client_id' not in raw_tokens:
+            cls.logger.error("[__read_token_storage] 'client_id' is not defined in token file")
+            raise TokenFileException("client_id missing")
+
+        if 'client_secret' not in raw_tokens:
+            cls.logger.error("[__read_token_storage] 'client_secret' is not defined in token file")
+            raise TokenFileException("client_secret missing")
+
+        return AccountingAPITokens(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
 
     @classmethod
-    def __update_token_storage(cls):
-        """
-        Saves the token variable to disk
-        """
-        if cls.tokens is None:
-            cls.logger.error(f"'tokens' is None. Aborted writing.")
-            return
-
-        with open(cls.tokens_file, 'w') as json_file:
-            json.dump(cls.tokens, json_file, indent=2)
-
-    @classmethod
-    def __refresh_access_token(cls):
+    def __retrieve_access_token(cls) -> Tuple[str, str]:
         """
         Fetches a new access token using the refresh token.
-        :return:
+        :return: Tuple of (access_token, access_token_timeout)
         """
         url = f"{cls.api_endpoint}/miami/v1/token"
 
@@ -58,38 +91,37 @@ class AccountingAPI(object):
             "grant_type": "client_credentials",
         }
 
-        auth = HTTPBasicAuth(cls.tokens['client_id'], cls.tokens['client_secret'])
+        auth = HTTPBasicAuth(cls.tokens.client_id, cls.tokens.client_secret)
 
         response = requests.post(url, data=payload, auth=auth)
         response.raise_for_status()
         json_response = response.json()
+
         # Calculate when the token expires
         expire_time = datetime.now() + timedelta(seconds=json_response['expires_in'] - 1)
-        cls.tokens['access_token_timeout'] = expire_time.isoformat(timespec='milliseconds')
-        cls.tokens['access_token'] = json_response['access_token']
+
+        return (json_response['access_token'], expire_time.isoformat(timespec='milliseconds'))
 
     @classmethod
-    def __refresh_ledger_id(cls):
-        cls.tokens['ledger_id'] = cls.get_ledger_id(cls.myshop_number)
+    def __retrieve_new_session(cls) -> AccountingAPISession:
+        (access_token, access_token_timeout) = cls.__retrieve_access_token()
+        ledger_id = cls.get_ledger_id(cls.myshop_number)
+
+        cls.logger.info("[__refresh_session] Successfully retrieved new session tokens")
+
+        return AccountingAPISession(
+            access_token=access_token, access_token_timeout=access_token_timeout, ledger_id=ledger_id, cursor=None
+        )
 
     @classmethod
     def __refresh_expired_token(cls):
         """
         Client side check if the token has expired.
         """
-        cls.__read_token_storage()
-
-        if 'access_token_timeout' not in cls.tokens:
-            cls.__refresh_access_token()
-
-        expire_time = parse_datetime(cls.tokens['access_token_timeout'])
+        expire_time = parse_datetime(cls.session.access_token_timeout)
         if datetime.now() >= expire_time:
-            cls.__refresh_access_token()
-
-        if 'ledger_id' not in cls.tokens:
-            cls.__refresh_ledger_id()
-
-        cls.__update_token_storage()
+            cls.logger.info("[__refresh_expired_token] Session tokens expired, retrieving new tokens")
+            cls.session = cls.__retrieve_new_session()
 
     @classmethod
     def get_transactions_historic(cls, transaction_date: date) -> list:
@@ -102,13 +134,13 @@ class AccountingAPI(object):
 
         ledger_date = transaction_date.strftime('%Y-%m-%d')
 
-        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.tokens['ledger_id']}/funds/dates/{ledger_date}"
+        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.session.ledger_id}/funds/dates/{ledger_date}"
 
         params = {
             'includeGDPRSensitiveData': "true",
         }
         headers = {
-            'authorization': 'Bearer {}'.format(cls.tokens['access_token']),
+            'authorization': 'Bearer {}'.format(cls.session.access_token),
         }
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
@@ -116,14 +148,14 @@ class AccountingAPI(object):
 
     @classmethod
     def fetch_report_by_feed(cls, cursor: str):
-        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.tokens['ledger_id']}/funds/feed"
+        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.session.ledger_id}/funds/feed"
 
         params = {
             'includeGDPRSensitiveData': "true",
             'cursor': cursor,
         }
         headers = {
-            'authorization': "Bearer {}".format(cls.tokens['access_token']),
+            'authorization': "Bearer {}".format(cls.session.access_token),
         }
 
         response = requests.get(url, params=params, headers=headers)
@@ -142,7 +174,7 @@ class AccountingAPI(object):
         cls.__refresh_expired_token()
 
         transactions = []
-        cursor = cls.tokens.get('cursor', "")
+        cursor = "" if cls.session.cursor is None else cls.session.cursor
 
         while True:
             res = cls.fetch_report_by_feed(cursor)
@@ -158,8 +190,7 @@ class AccountingAPI(object):
             if len(res['items']) == 0:
                 break
 
-        cls.tokens['cursor'] = cursor
-        cls.__update_token_storage()
+        cls.session.cursor = cursor
         return transactions
 
     @classmethod
@@ -186,7 +217,7 @@ class AccountingAPI(object):
         url = f"{cls.api_endpoint}/settlement/v1/ledgers"
         params = {'settlesForRecipientHandles': 'DK:{}'.format(myshop_number)}
         headers = {
-            'authorization': 'Bearer {}'.format(cls.tokens['access_token']),
+            'authorization': 'Bearer {}'.format(cls.session.access_token),
         }
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
