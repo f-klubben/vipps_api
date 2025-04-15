@@ -33,7 +33,7 @@ class AccountingAPISession:
     cursor: str | None
 
 
-class AccountingAPI(object):
+class ReportAPI(object):
     api_endpoint = 'https://api.vipps.no'
     # Saves secret tokens to the file "vipps-tokens.json" right next to this file.
     # Important to use a separate file since the tokens can change and is thus not suitable for django settings.

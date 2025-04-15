@@ -28,18 +28,18 @@ class TestAPI:
     def test_ledger_id_parsed(self, mock_ledger_info_response):
         expectedLedgerId = 123456
 
-        AccountingAPI.tokens_file = (Path(__file__).parent / 'fixtures' / 'vipps-tokens.valid.json').as_posix()
-        AccountingAPI.session = AccountingAPISession("_access_token_", "", None)
+        ReportAPI.tokens_file = (Path(__file__).parent / 'fixtures' / 'vipps-tokens.valid.json').as_posix()
+        ReportAPI.session = ReportAPISession("_access_token_", "", None)
 
-        actualLedgerId = AccountingAPI.get_ledger_id(0)
+        actualLedgerId = ReportAPI.get_ledger_id(0)
 
         assert actualLedgerId == expectedLedgerId
 
 
 class TestConfigurationFiles:
     def test_load_token_storage(self):
-        AccountingAPI.tokens_file = (Path(__file__).parent / 'fixtures' / 'vipps-tokens.valid.json').as_posix()
-        tokens = AccountingAPI._AccountingAPI__read_token_storage()
+        ReportAPI.tokens_file = (Path(__file__).parent / 'fixtures' / 'vipps-tokens.valid.json').as_posix()
+        tokens = ReportAPI._ReportAPI__read_token_storage()
 
         assert tokens is not None
         assert tokens.client_id == "8f51e573-afcc-429d-7b6e-09aacc8f0e86"
