@@ -17,31 +17,37 @@ class TokenFileException(Exception):
 
 
 @dataclass(frozen=True)
-class AccountingAPITokens:
+class AccountingAPIKeys:
+    """
+    The lowest level API keys, which only provide access to ReportAPI.
+    https://developer.vippsmobilepay.com/docs/partner/partner-keys/
+    """
+
     client_id: str
     client_secret: str
 
 
 @dataclass
-class AccountingAPISession:
+class ReportAPIAccessToken:
     """
-    Stores the shortlived state used in the API.
+    The session access token used in report API. Expires every 15 minutes.
+    https://developer.vippsmobilepay.com/docs/APIs/access-token-api/partner-authentication/
     """
 
     access_token: str
     access_token_timeout: str
-    cursor: str | None
 
 
-class AccountingAPI(object):
+class ReportAPI(object):
     api_endpoint = 'https://api.vipps.no'
     # Saves secret tokens to the file "vipps-tokens.json" right next to this file.
     # Important to use a separate file since the tokens can change and is thus not suitable for django settings.
     tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
-    tokens: AccountingAPITokens
-    session: AccountingAPISession
+    tokens: AccountingAPIKeys
+    session: ReportAPIAccessToken
     ledger_id: int | None
+    cursor: str | None
 
     myshop_number = 90602
     logger = logging.getLogger(__name__)
@@ -52,7 +58,7 @@ class AccountingAPI(object):
         cls.session = cls.__retrieve_access_token()
 
     @classmethod
-    def __read_token_storage(cls) -> AccountingAPITokens:
+    def __read_token_storage(cls) -> AccountingAPIKeys:
         """
         Reads the token variable from disk
         """
@@ -78,10 +84,10 @@ class AccountingAPI(object):
             cls.logger.error("[__read_token_storage] 'client_secret' is not defined in token file")
             raise TokenFileException("client_secret missing")
 
-        return AccountingAPITokens(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
+        return AccountingAPIKeys(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
 
     @classmethod
-    def __retrieve_new_session(cls) -> AccountingAPISession:
+    def __retrieve_new_session(cls) -> ReportAPIAccessToken:
         """
         Fetches a new access token using the refresh token.
         :return: Tuple of (access_token, access_token_timeout)
@@ -105,7 +111,7 @@ class AccountingAPI(object):
         access_token = json_response['access_token']
         access_token_timeout = expire_time.isoformat(timespec='milliseconds')
 
-        return AccountingAPISession(access_token=access_token, access_token_timeout=access_token_timeout, cursor=None)
+        return ReportAPIAccessToken(access_token=access_token, access_token_timeout=access_token_timeout)
 
     @classmethod
     def get_ledger_info(cls, myshop_number: int):
@@ -217,7 +223,7 @@ class AccountingAPI(object):
         cls.__refresh_expired_token()
 
         transactions = []
-        cursor = "" if cls.session.cursor is None else cls.session.cursor
+        cursor = "" if cls.cursor is None else cls.cursor
 
         while True:
             res = cls.fetch_report_by_feed(cursor)
@@ -233,5 +239,5 @@ class AccountingAPI(object):
             if len(res['items']) == 0:
                 break
 
-        cls.session.cursor = cursor
+        cls.cursor = cursor
         return transactions
