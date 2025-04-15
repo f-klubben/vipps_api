@@ -30,11 +30,10 @@ class AccountingAPISession:
 
     access_token: str
     access_token_timeout: str
-    ledger_id: int
     cursor: str | None
 
 
-class AccountingAPI:
+class AccountingAPI(object):
     api_endpoint = 'https://api.vipps.no'
     # Saves secret tokens to the file "vipps-tokens.json" right next to this file.
     # Important to use a separate file since the tokens can change and is thus not suitable for django settings.
@@ -42,13 +41,15 @@ class AccountingAPI:
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
     tokens: AccountingAPITokens
     session: AccountingAPISession
+    ledger_id: int | None
 
     myshop_number = 90602
     logger = logging.getLogger(__name__)
 
-    def __init__(self):
-        self.session = self.__retrieve_access_token()
-        self.tokens = self.__read_token_storage()
+    @classmethod
+    def load(cls):
+        cls.tokens = cls.__read_token_storage()
+        cls.session = cls.__retrieve_access_token()
 
     @classmethod
     def __read_token_storage(cls) -> AccountingAPITokens:
@@ -80,7 +81,7 @@ class AccountingAPI:
         return AccountingAPITokens(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
 
     @classmethod
-    def __retrieve_access_token(cls) -> Tuple[str, str]:
+    def __retrieve_new_session(cls) -> AccountingAPISession:
         """
         Fetches a new access token using the refresh token.
         :return: Tuple of (access_token, access_token_timeout)
@@ -100,18 +101,54 @@ class AccountingAPI:
         # Calculate when the token expires
         expire_time = datetime.now() + timedelta(seconds=json_response['expires_in'] - 1)
 
-        return (json_response['access_token'], expire_time.isoformat(timespec='milliseconds'))
+        cls.logger.info("[__refresh_session] Successfully retrieved new session tokens")
+        access_token = json_response['access_token']
+        access_token_timeout = expire_time.isoformat(timespec='milliseconds')
+
+        return AccountingAPISession(access_token=access_token, access_token_timeout=access_token_timeout, cursor=None)
 
     @classmethod
-    def __retrieve_new_session(cls) -> AccountingAPISession:
-        (access_token, access_token_timeout) = cls.__retrieve_access_token()
-        ledger_id = cls.get_ledger_id(cls.myshop_number)
+    def get_ledger_info(cls, myshop_number: int):
+        """
+        {
+            "ledgerId": "123456",
+            "currency": "DKK",
+            "payoutBankAccount": {
+                "scheme": "BBAN:DK",
+                "id": "123412341234123412"
+            },
+            "owner": {
+                "scheme": "business:DK:CVR",
+                "id": "16427888"
+            },
+            "settlesForRecipientHandles": [
+                "DK:90601"
+            ]
+        }
+        :param myshop_number:
+        :return:
+        """
+        url = f"{cls.api_endpoint}/settlement/v1/ledgers"
+        params = {'settlesForRecipientHandles': 'DK:{}'.format(myshop_number)}
+        headers = {
+            'authorization': 'Bearer {}'.format(cls.session.access_token),
+        }
+        response = requests.get(url, params=params, headers=headers)
+        response.raise_for_status()
 
-        cls.logger.info("[__refresh_session] Successfully retrieved new session tokens")
+        ledger_info = response.json()["items"]
 
-        return AccountingAPISession(
-            access_token=access_token, access_token_timeout=access_token_timeout, ledger_id=ledger_id, cursor=None
-        )
+        assert len(ledger_info) != 0
+
+        return ledger_info[0]
+
+    @classmethod
+    def get_ledger_id(cls, myshop_number: int) -> int:
+        return int(cls.get_ledger_info(myshop_number)["ledgerId"])
+
+    @classmethod
+    def __refresh_ledger_id(cls):
+        cls.ledger_id = cls.get_ledger_id(cls.myshop_number)
 
     @classmethod
     def __refresh_expired_token(cls):
@@ -122,6 +159,9 @@ class AccountingAPI:
         if datetime.now() >= expire_time:
             cls.logger.info("[__refresh_expired_token] Session tokens expired, retrieving new tokens")
             cls.session = cls.__retrieve_new_session()
+
+        if cls.ledger_id is None:
+            __refresh_ledger_id()
 
     @classmethod
     def get_transactions_historic(cls, transaction_date: date) -> list:
@@ -134,7 +174,7 @@ class AccountingAPI:
 
         ledger_date = transaction_date.strftime('%Y-%m-%d')
 
-        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.session.ledger_id}/funds/dates/{ledger_date}"
+        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.ledger_id}/funds/dates/{ledger_date}"
 
         params = {
             'includeGDPRSensitiveData': "true",
@@ -148,7 +188,10 @@ class AccountingAPI:
 
     @classmethod
     def fetch_report_by_feed(cls, cursor: str):
-        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.session.ledger_id}/funds/feed"
+        if cls.ledger_id is None:
+            cls.__refresh_ledger_id()
+
+        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.ledger_id}/funds/feed"
 
         params = {
             'includeGDPRSensitiveData': "true",
@@ -192,42 +235,3 @@ class AccountingAPI:
 
         cls.session.cursor = cursor
         return transactions
-
-    @classmethod
-    def get_ledger_info(cls, myshop_number: int):
-        """
-        {
-            "ledgerId": "123456",
-            "currency": "DKK",
-            "payoutBankAccount": {
-                "scheme": "BBAN:DK",
-                "id": "123412341234123412"
-            },
-            "owner": {
-                "scheme": "business:DK:CVR",
-                "id": "16427888"
-            },
-            "settlesForRecipientHandles": [
-                "DK:90601"
-            ]
-        }
-        :param myshop_number:
-        :return:
-        """
-        url = f"{cls.api_endpoint}/settlement/v1/ledgers"
-        params = {'settlesForRecipientHandles': 'DK:{}'.format(myshop_number)}
-        headers = {
-            'authorization': 'Bearer {}'.format(cls.session.access_token),
-        }
-        response = requests.get(url, params=params, headers=headers)
-        response.raise_for_status()
-
-        ledger_info = response.json()["items"]
-
-        assert len(ledger_info) != 0
-
-        return ledger_info[0]
-
-    @classmethod
-    def get_ledger_id(cls, myshop_number: int) -> int:
-        return int(cls.get_ledger_info(myshop_number)["ledgerId"])
