@@ -37,11 +37,11 @@ class TestAPI:
         assert actualLedgerId == expectedLedgerId
 
 
-class TestConfigurationFiles:
-    def test_load_token_storage(self):
-        report = ReportAPI(None, 23456)
-        report.tokens_file = (Path(__file__).parent / 'fixtures' / 'vipps-tokens.valid.json').as_posix()
-        tokens = report._ReportAPI__read_token_storage()
+class TestUtils:
+    def test_load_from_file(self):
+        test_path = (Path(__file__).parent / 'fixtures' / 'vipps-tokens.valid.json').as_posix()
+
+        tokens = Utils.load_accounting_keys_from_file(test_path)
 
         assert tokens is not None
         assert tokens.client_id == "8f51e573-afcc-429d-7b6e-09aacc8f0e86"
