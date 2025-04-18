@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vipps-api"
+description = "A client implementation of Vipps-MobilePay Report API"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+maintainers = [
+    { name = "F-Klubben", email = "fit@fklub.dk" }
+]
+
+authors = [
+    { name = "Falke Carlsen" },
+    { name = "Kresten Laust", email = "kscker23@student.aau.dk" },
+    { name = "Jonas B. Andersen" },
+    { name = "Bo Andersen" },
+    { name = "Asger Weirsøe" },
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+]
+
+requires-python = ">= 3.10"
+
+dependencies = [
+    "Django>=2.2",
+    "requests>=2.24.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/f-klubben/vipps_api"
+Repository = "https://github.com/f-klubben/vipps_api.git"
+Issues = "https://github.com/f-klubben/vipps_api/issues"
