@@ -38,38 +38,37 @@ class ReportAPIAccessToken:
     access_token_timeout: str
 
 
-class ReportAPI(object):
+class ReportAPI:
     api_endpoint = 'https://api.vipps.no'
-    # Saves secret tokens to the file "vipps-tokens.json" right next to this file.
-    # Important to use a separate file since the tokens can change and is thus not suitable for django settings.
+    logger = logging.getLogger(__name__)
+
     tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
     tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
+
     tokens: AccountingAPIKeys
     session: ReportAPIAccessToken
     ledger_id: int | None
     cursor: str | None
 
-    myshop_number = 90602
-    logger = logging.getLogger(__name__)
+    def __init__(self, api_keys: AccountingAPIKeys, myshop_number: int):
+        self.tokens = api_keys
+        self.myshop_number = myshop_number
 
-    @classmethod
-    def load(cls):
-        cls.tokens = cls.__read_token_storage()
-        cls.session = cls.__retrieve_access_token()
+    def load(self):
+        self.session = self.__retrieve_access_token()
 
-    @classmethod
-    def __read_token_storage(cls) -> AccountingAPIKeys:
+    def __read_token_storage(self) -> AccountingAPIKeys:
         """
         Reads the token variable from disk
         """
         raw_tokens: Any
-        with open(cls.tokens_file, 'r') as json_file:
+        with open(self.tokens_file, 'r') as json_file:
             raw_tokens = json.load(json_file)
 
         if raw_tokens is None:
-            cls.logger.error("read token from storage. 'tokens' is None. Reverting to backup tokens")
+            self.logger.error("read token from storage. 'tokens' is None. Reverting to backup tokens")
 
-            with open(cls.tokens_file_backup, 'r') as json_file_backup:
+            with open(self.tokens_file_backup, 'r') as json_file_backup:
                 raw_tokens = json.load(json_file_backup)
 
         # Read tokens
@@ -77,28 +76,27 @@ class ReportAPI(object):
             raise TokenFileException("Token file is None")
 
         if 'client_id' not in raw_tokens:
-            cls.logger.error("[__read_token_storage] 'client_id' is not defined in token file")
+            self.logger.error("[__read_token_storage] 'client_id' is not defined in token file")
             raise TokenFileException("client_id missing")
 
         if 'client_secret' not in raw_tokens:
-            cls.logger.error("[__read_token_storage] 'client_secret' is not defined in token file")
+            self.logger.error("[__read_token_storage] 'client_secret' is not defined in token file")
             raise TokenFileException("client_secret missing")
 
         return AccountingAPIKeys(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
 
-    @classmethod
-    def __retrieve_new_session(cls) -> ReportAPIAccessToken:
+    def __retrieve_new_session(self) -> ReportAPIAccessToken:
         """
         Fetches a new access token using the refresh token.
         :return: Tuple of (access_token, access_token_timeout)
         """
-        url = f"{cls.api_endpoint}/miami/v1/token"
+        url = f"{self.api_endpoint}/miami/v1/token"
 
         payload = {
             "grant_type": "client_credentials",
         }
 
-        auth = HTTPBasicAuth(cls.tokens.client_id, cls.tokens.client_secret)
+        auth = HTTPBasicAuth(self.tokens.client_id, self.tokens.client_secret)
 
         response = requests.post(url, data=payload, auth=auth)
         response.raise_for_status()
@@ -107,14 +105,13 @@ class ReportAPI(object):
         # Calculate when the token expires
         expire_time = datetime.now() + timedelta(seconds=json_response['expires_in'] - 1)
 
-        cls.logger.info("[__refresh_session] Successfully retrieved new session tokens")
+        self.logger.info("[__refresh_session] Successfully retrieved new session tokens")
         access_token = json_response['access_token']
         access_token_timeout = expire_time.isoformat(timespec='milliseconds')
 
         return ReportAPIAccessToken(access_token=access_token, access_token_timeout=access_token_timeout)
 
-    @classmethod
-    def get_ledger_info(cls, myshop_number: int):
+    def get_ledger_info(self, myshop_number: int):
         """
         {
             "ledgerId": "123456",
@@ -134,10 +131,10 @@ class ReportAPI(object):
         :param myshop_number:
         :return:
         """
-        url = f"{cls.api_endpoint}/settlement/v1/ledgers"
+        url = f"{self.api_endpoint}/settlement/v1/ledgers"
         params = {'settlesForRecipientHandles': 'DK:{}'.format(myshop_number)}
         headers = {
-            'authorization': 'Bearer {}'.format(cls.session.access_token),
+            'authorization': 'Bearer {}'.format(self.session.access_token),
         }
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
@@ -148,63 +145,58 @@ class ReportAPI(object):
 
         return ledger_info[0]
 
-    @classmethod
-    def get_ledger_id(cls, myshop_number: int) -> int:
-        return int(cls.get_ledger_info(myshop_number)["ledgerId"])
+    def get_ledger_id(self, myshop_number: int) -> int:
+        return int(self.get_ledger_info(myshop_number)["ledgerId"])
 
-    @classmethod
-    def __refresh_ledger_id(cls):
-        cls.ledger_id = cls.get_ledger_id(cls.myshop_number)
+    def __refresh_ledger_id(self):
+        self.ledger_id = self.get_ledger_id(self.myshop_number)
 
-    @classmethod
-    def __refresh_expired_token(cls):
+    def __refresh_expired_token(self):
         """
         Client side check if the token has expired.
         """
-        expire_time = parse_datetime(cls.session.access_token_timeout)
+        expire_time = parse_datetime(self.session.access_token_timeout)
         if datetime.now() >= expire_time:
-            cls.logger.info("[__refresh_expired_token] Session tokens expired, retrieving new tokens")
-            cls.session = cls.__retrieve_new_session()
+            self.logger.info("[__refresh_expired_token] Session tokens expired, retrieving new tokens")
+            self.session = self.__retrieve_new_session()
 
-        if cls.ledger_id is None:
+        if self.ledger_id is None:
             __refresh_ledger_id()
 
-    @classmethod
-    def get_transactions_historic(cls, transaction_date: date) -> list:
+    def get_transactions_historic(self, transaction_date: date) -> list:
         """
         Fetches historic transactions (only complete days (e.g. not today)) by date.
         :param transaction_date: The date to look up.
         :return: List of transactions on that date.
         """
-        cls.__refresh_expired_token()
+        self.__refresh_expired_token()
 
         ledger_date = transaction_date.strftime('%Y-%m-%d')
 
-        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.ledger_id}/funds/dates/{ledger_date}"
+        url = f"{self.api_endpoint}/report/v2/ledgers/{self.ledger_id}/funds/dates/{ledger_date}"
 
         params = {
             'includeGDPRSensitiveData': "true",
         }
         headers = {
-            'authorization': 'Bearer {}'.format(cls.session.access_token),
+            'authorization': 'Bearer {}'.format(self.session.access_token),
         }
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
         return response.json()['items']
 
-    @classmethod
-    def fetch_report_by_feed(cls, cursor: str):
-        if cls.ledger_id is None:
-            cls.__refresh_ledger_id()
+    def fetch_report_by_feed(self, cursor: str):
+        if self.ledger_id is None:
+            self.__refresh_ledger_id()
 
-        url = f"{cls.api_endpoint}/report/v2/ledgers/{cls.ledger_id}/funds/feed"
+        url = f"{self.api_endpoint}/report/v2/ledgers/{self.ledger_id}/funds/feed"
 
         params = {
             'includeGDPRSensitiveData': "true",
             'cursor': cursor,
         }
         headers = {
-            'authorization': "Bearer {}".format(cls.session.access_token),
+            'authorization': "Bearer {}".format(self.session.access_token),
         }
 
         response = requests.get(url, params=params, headers=headers)
@@ -212,21 +204,20 @@ class ReportAPI(object):
 
         return response.json()
 
-    @classmethod
-    def get_transactions_latest_feed(cls) -> list:
+    def get_transactions_latest_feed(self) -> list:
         """
         Fetches transactions ahead of cursor. Used to fetch very recent transactions.
         Moves the cursor as well.
         :return: All transactions from the current cursor till it's emptied.
         """
 
-        cls.__refresh_expired_token()
+        self.__refresh_expired_token()
 
         transactions = []
-        cursor = "" if cls.cursor is None else cls.cursor
+        cursor = "" if self.cursor is None else self.cursor
 
         while True:
-            res = cls.fetch_report_by_feed(cursor)
+            res = self.fetch_report_by_feed(cursor)
             transactions.extend(res['items'])
 
             try_later = res['tryLater'] == "true"
@@ -239,5 +230,5 @@ class ReportAPI(object):
             if len(res['items']) == 0:
                 break
 
-        cls.cursor = cursor
+        self.cursor = cursor
         return transactions
