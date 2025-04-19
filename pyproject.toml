@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "vipps-api"
+name = "vippsclient"
 description = "A client implementation of Vipps-MobilePay Report API"
 readme = "README.md"
 license = { file = "LICENSE" }
