@@ -1,9 +1,10 @@
 import pytest
 from pathlib import Path
-from vipps_api import *
 
 from unittest.mock import patch
 from http import HTTPStatus
+
+from vipps_api.accounting import *
 
 
 @pytest.fixture
