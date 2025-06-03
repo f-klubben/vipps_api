@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "vippsclient"
-description = "A client implementation of Vipps-MobilePay Report API"
+name = "vipps-api"
+description = "An implementation of Vipps-MobilePay API (Supports Report API)"
 readme = "README.md"
 license = { file = "LICENSE" }
 
@@ -28,6 +28,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: OS Independent",
 ]
 
 requires-python = ">= 3.10"
