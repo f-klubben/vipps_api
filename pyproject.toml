@@ -1,12 +1,13 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "vipps-api"
 description = "An implementation of Vipps-MobilePay API (Supports Report API)"
 readme = "README.md"
 license = { file = "LICENSE" }
+version = "0.1.0"
 
 maintainers = [
     { name = "F-Klubben", email = "fit@fklub.dk" }
