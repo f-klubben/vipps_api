@@ -4,8 +4,10 @@ import json
 
 from .keys import AccountingAPIKeys
 
+
 class TokenFileException(Exception):
     pass
+
 
 class Utils(object):
     logger = logging.getLogger(__name__)
