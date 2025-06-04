@@ -31,7 +31,7 @@ class TestAPI:
 
         report = ReportAPI(AccountingAPIKeys("<<client_id>>", "<<client_secret>>"), 23456)
         report.tokens_file = (Path(__file__).parent / 'fixtures' / 'vipps-tokens.valid.json').as_posix()
-        report.session = ReportAPIAccessToken("_access_token_", "")
+        report.session = AccessToken("_access_token_", "")
 
         actualLedgerId = report.get_ledger_id(0)
 
