@@ -3,64 +3,18 @@ from django.utils.dateparse import parse_datetime
 
 from requests.auth import HTTPBasicAuth
 import requests
-from pathlib import Path
 
-import json
 import logging
 
-from dataclasses import dataclass
 from typing import Any, Tuple
+from dataclasses import dataclass
 
-
-class TokenFileException(Exception):
-    pass
-
-
-@dataclass(frozen=True)
-class AccountingAPIKeys:
-    """
-    The lowest level API keys, which only provide access to ReportAPI.
-    https://developer.vippsmobilepay.com/docs/partner/partner-keys/
-    """
-
-    client_id: str
-    client_secret: str
-
-
-class Utils(object):
-    logger = logging.getLogger(__name__)
-
-    tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
-    tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
-
-    @staticmethod
-    def load_accounting_keys_from_file(path: str) -> AccountingAPIKeys:
-        with open(path, 'r') as json_file:
-            raw_tokens = json.load(json_file)
-
-            if raw_tokens is None:
-                raise TokenFileException("Token file is None")
-
-            if 'client_id' not in raw_tokens:
-                raise TokenFileException("client_id missing")
-
-            if 'client_secret' not in raw_tokens:
-                raise TokenFileException("client_secret missing")
-
-            return AccountingAPIKeys(client_id=raw_tokens['client_id'], client_secret=raw_tokens['client_secret'])
-
-    @classmethod
-    def load_accounting_api_keys(cls) -> AccountingAPIKeys:
-        try:
-            return Utils.load_accounting_keys_from_file(cls.tokens_file)
-        except:
-            cls.logger.error("tokens file not correct. Reverting to backup")
-
-        return Utils.load_accounting_keys_from_file(cls.tokens_file_backup)
+from .keys import AccountingAPIKeys
+from .utils import Utils
 
 
 @dataclass
-class ReportAPIAccessToken:
+class AccessToken:
     """
     The session access token used in report API. Expires every 15 minutes.
     https://developer.vippsmobilepay.com/docs/APIs/access-token-api/partner-authentication/
@@ -75,7 +29,7 @@ class ReportAPI:
     logger = logging.getLogger(__name__)
 
     tokens: AccountingAPIKeys
-    session: ReportAPIAccessToken
+    session: AccessToken
     ledger_id: int | None
     cursor: str | None
 
@@ -86,7 +40,7 @@ class ReportAPI:
     def load(self):
         self.session = self.__retrieve_access_token()
 
-    def __retrieve_new_session(self) -> ReportAPIAccessToken:
+    def __retrieve_new_session(self) -> AccessToken:
         """
         Fetches a new access token using the refresh token.
         :return: Tuple of (access_token, access_token_timeout)
@@ -110,7 +64,7 @@ class ReportAPI:
         access_token = json_response['access_token']
         access_token_timeout = expire_time.isoformat(timespec='milliseconds')
 
-        return ReportAPIAccessToken(access_token=access_token, access_token_timeout=access_token_timeout)
+        return AccessToken(access_token=access_token, access_token_timeout=access_token_timeout)
 
     def get_ledger_info(self, myshop_number: int):
         """
@@ -162,7 +116,7 @@ class ReportAPI:
             self.session = self.__retrieve_new_session()
 
         if self.ledger_id is None:
-            __refresh_ledger_id()
+            self.__refresh_ledger_id()
 
     def get_transactions_historic(self, transaction_date: date) -> list:
         """
