@@ -38,7 +38,7 @@ class ReportAPI:
         self.myshop_number = myshop_number
 
     def load(self):
-        self.session = self.__retrieve_access_token()
+        self.session = self.__retrieve_new_session()
 
     def __retrieve_new_session(self) -> AccessToken:
         """
