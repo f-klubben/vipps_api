@@ -1,6 +1,4 @@
 from datetime import datetime, timedelta, date
-from django.utils.dateparse import parse_datetime
-
 from requests.auth import HTTPBasicAuth
 import requests
 
@@ -21,7 +19,7 @@ class AccessToken:
     """
 
     access_token: str
-    access_token_timeout: str
+    access_token_timeout: datetime
 
 
 class ReportAPI:
@@ -62,9 +60,8 @@ class ReportAPI:
 
         self.logger.info("[__refresh_session] Successfully retrieved new session tokens")
         access_token = json_response['access_token']
-        access_token_timeout = expire_time.isoformat(timespec='milliseconds')
 
-        return AccessToken(access_token=access_token, access_token_timeout=access_token_timeout)
+        return AccessToken(access_token=access_token, access_token_timeout=expire_time)
 
     def get_ledger_info(self, myshop_number: int):
         """
@@ -110,7 +107,7 @@ class ReportAPI:
         """
         Client side check if the token has expired.
         """
-        expire_time = parse_datetime(self.session.access_token_timeout)
+        expire_time = self.session.access_token_timeout
         if datetime.now() >= expire_time:
             self.logger.info("[__refresh_expired_token] Session tokens expired, retrieving new tokens")
             self.session = self.__retrieve_new_session()
