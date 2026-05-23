@@ -35,7 +35,6 @@ classifiers = [
 requires-python = ">= 3.10"
 
 dependencies = [
-    "Django>=2.2",
     "requests>=2.24.0"
 ]
 
@@ -43,3 +42,10 @@ dependencies = [
 Homepage = "https://github.com/f-klubben/vipps_api"
 Repository = "https://github.com/f-klubben/vipps_api.git"
 Issues = "https://github.com/f-klubben/vipps_api/issues"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+    "pytest>=9.0.3",
+    "types-requests>=2.24.0",
+]

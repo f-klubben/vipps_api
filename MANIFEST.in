@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+include src/vipps_api/vipps-tokens.example.json
+recursive-include tests *.py
