@@ -27,13 +27,16 @@ class ReportAPI:
     logger = logging.getLogger(__name__)
 
     tokens: AccountingAPIKeys
-    session: AccessToken
+    session: AccessToken | None
     ledger_id: int | None
     cursor: str | None
 
     def __init__(self, api_keys: AccountingAPIKeys, myshop_number: int):
         self.tokens = api_keys
         self.myshop_number = myshop_number
+        self.session = None
+        self.ledger_id = None
+        self.cursor = None
 
     def load(self):
         self.session = self.__retrieve_new_session()
@@ -86,7 +89,7 @@ class ReportAPI:
         url = f"{self.api_endpoint}/settlement/v1/ledgers"
         params = {'settlesForRecipientHandles': 'DK:{}'.format(myshop_number)}
         headers = {
-            'authorization': 'Bearer {}'.format(self.session.access_token),
+            'authorization': 'Bearer {}'.format(self.__refresh_session().access_token),
         }
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
@@ -103,17 +106,25 @@ class ReportAPI:
     def __refresh_ledger_id(self):
         self.ledger_id = self.get_ledger_id(self.myshop_number)
 
-    def __refresh_expired_token(self):
-        """
-        Client side check if the token has expired.
-        """
-        expire_time = self.session.access_token_timeout
-        if datetime.now() >= expire_time:
-            self.logger.info("[__refresh_expired_token] Session tokens expired, retrieving new tokens")
+    def __refresh_session(self) -> AccessToken:
+        if self.session is None:
+            self.logger.info("[__refresh_session] No session yet, retrieving new tokens")
+            self.session = self.__retrieve_new_session()
+        elif datetime.now() >= self.session.access_token_timeout:
+            self.logger.info("[__refresh_session] Session tokens expired, retrieving new tokens")
             self.session = self.__retrieve_new_session()
 
+        return self.session
+
+    def __ensure_ready(self) -> AccessToken:
+        """
+        Ensures a valid session and ledger id exist. Both are fetched lazily, so a ReportAPI
+        is usable right after construction (nothing has to call load()).
+        """
         if self.ledger_id is None:
             self.__refresh_ledger_id()
+
+        return self.__refresh_session()
 
     def get_transactions_historic(self, transaction_date: date) -> list:
         """
@@ -121,7 +132,7 @@ class ReportAPI:
         :param transaction_date: The date to look up.
         :return: List of transactions on that date.
         """
-        self.__refresh_expired_token()
+        session = self.__ensure_ready()
 
         ledger_date = transaction_date.strftime('%Y-%m-%d')
 
@@ -131,15 +142,14 @@ class ReportAPI:
             'includeGDPRSensitiveData': "true",
         }
         headers = {
-            'authorization': 'Bearer {}'.format(self.session.access_token),
+            'authorization': 'Bearer {}'.format(session.access_token),
         }
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()
         return response.json()['items']
 
     def fetch_report_by_feed(self, cursor: str):
-        if self.ledger_id is None:
-            self.__refresh_ledger_id()
+        session = self.__ensure_ready()
 
         url = f"{self.api_endpoint}/report/v2/ledgers/{self.ledger_id}/funds/feed"
 
@@ -148,7 +158,7 @@ class ReportAPI:
             'cursor': cursor,
         }
         headers = {
-            'authorization': "Bearer {}".format(self.session.access_token),
+            'authorization': "Bearer {}".format(session.access_token),
         }
 
         response = requests.get(url, params=params, headers=headers)
@@ -162,8 +172,6 @@ class ReportAPI:
         Moves the cursor as well.
         :return: All transactions from the current cursor till it's emptied.
         """
-
-        self.__refresh_expired_token()
 
         transactions = []
         cursor = "" if self.cursor is None else self.cursor
