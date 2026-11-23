@@ -29,3 +29,7 @@ Install mypy in your environment `pip install mypy`
 You should simply be anble to run Mypy
 
 `mypy .` (might need explicit invocation `python -m mypy`)
+
+## Releasing
+
+Releases are published from the `release` branch. Bump `__version__` in `src/vipps_api/__init__.py`, push to `release`, and the publish workflow uploads that version to PyPI. Versions already on PyPI are skipped, so re-pushing is harmless.
