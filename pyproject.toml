@@ -46,3 +46,6 @@ Issues = "https://github.com/f-klubben/vipps_api/issues"
 
 [tool.setuptools.dynamic]
 version = { attr = "vipps_api.__version__" }
+
+[tool.setuptools.package-data]
+vipps_api = ["py.typed"]
