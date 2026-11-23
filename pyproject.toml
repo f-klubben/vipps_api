@@ -16,7 +16,7 @@ maintainers = [
 
 authors = [
     { name = "Falke Carlsen" },
-    { name = "Kresten Laust", email = "kscker23@student.aau.dk" },
+    { name = "Kresten Laust" },
     { name = "Jonas B. Andersen" },
     { name = "Bo Andersen" },
     { name = "Asger Weirsøe" },
