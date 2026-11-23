@@ -1,6 +1,9 @@
 *.pyc
 *.pyo
+__pycache__/
+*.egg-info/
 /dist
 /build
 /ez_setup.py
-/*.egg-info
+.pytest_cache/
+.mypy_cache/
