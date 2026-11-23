@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 import json
 
@@ -12,8 +13,9 @@ class TokenFileException(Exception):
 class Utils(object):
     logger = logging.getLogger(__name__)
 
-    tokens_file = (Path(__file__).parent / 'vipps-tokens.json').as_posix()
-    tokens_file_backup = (Path(__file__).parent / 'vipps-tokens.json.bak').as_posix()
+    config_dir = Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config') / 'vipps-api'
+    tokens_file = (config_dir / 'vipps-tokens.json').as_posix()
+    tokens_file_backup = (config_dir / 'vipps-tokens.json.bak').as_posix()
 
     @staticmethod
     def load_accounting_keys_from_file(path: str) -> AccountingAPIKeys:
