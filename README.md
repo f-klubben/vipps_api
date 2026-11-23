@@ -32,4 +32,4 @@ You should simply be anble to run Mypy
 
 ## Releasing
 
-Releases are published from the `release` branch. Bump `__version__` in `src/vipps_api/__init__.py`, push to `release`, and the publish workflow uploads that version to PyPI. Versions already on PyPI are skipped, so re-pushing is harmless.
+Published from the `release` branch; see [RELEASING.md](RELEASING.md).
