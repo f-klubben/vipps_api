@@ -8,7 +8,7 @@ description = "An implementation of Vipps-MobilePay API (Supports Report API)"
 readme = "README.md"
 license = "LicenseRef-Limfjords-Porter-Ware"
 license-files = ["LICENSE"]
-version = "0.1.0"
+dynamic = ["version"]
 
 maintainers = [
     { name = "F-Klubben", email = "fit@fklub.dk" }
@@ -43,3 +43,6 @@ dependencies = [
 Homepage = "https://github.com/f-klubben/vipps_api"
 Repository = "https://github.com/f-klubben/vipps_api.git"
 Issues = "https://github.com/f-klubben/vipps_api/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "vipps_api.__version__" }
