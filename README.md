@@ -1,6 +1,12 @@
 # Vipps Report API
 
+[![PyPI](https://img.shields.io/pypi/v/vipps-api.svg)](https://pypi.org/project/vipps-api/)
+
 This is the Vipps-MobilePay accounting API implementation from f-klubben/stregsystemet. This is an experiment to fully type the implementation to make it more robust.
+
+## Installation
+
+`pip install vipps-api`
 
 ## Development
 
